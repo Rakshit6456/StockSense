@@ -9,7 +9,9 @@ Features:
 import pandas as pd
 import streamlit as st
 
+from datetime import date, timedelta
 from backend import inventory as inv
+from backend.exports import sales_csv
 from pages._utils import render_auth_guard, render_sidebar
 
 st.set_page_config(page_title="Sales & Purchases — StockSense", page_icon="💳", layout="wide")
@@ -198,6 +200,57 @@ with tab_purchase:
             st.error(f"❌ Purchase Error: {e}")
         except Exception as e:
             st.error(f"❌ Unexpected Error: {e}")
+
+
+# ---------------------------------------------------------------------------
+# SALES CSV EXPORT
+# ---------------------------------------------------------------------------
+st.subheader("⬇️ Export Sales to CSV")
+st.caption("Download a filtered CSV of sale transactions. Respects date range, product and category filters.")
+
+e_col1, e_col2, e_col3, e_col4 = st.columns([1, 1, 1, 1])
+with e_col1:
+    export_start = st.date_input("Start Date", value=date.today() - timedelta(days=30), key="exp_start")
+with e_col2:
+    export_end = st.date_input("End Date", value=date.today(), key="exp_end")
+with e_col3:
+    export_sku_opts = ["All Products"] + [p["sku"] for p in products]
+    export_sku_sel = st.selectbox("Product SKU", export_sku_opts, key="exp_sku")
+    export_sku = None if export_sku_sel == "All Products" else export_sku_sel
+with e_col4:
+    all_cats = sorted({p.get("category") for p in products if p.get("category")})
+    export_cat_opts = ["All Categories"] + all_cats
+    export_cat_sel = st.selectbox("Category", export_cat_opts, key="exp_cat")
+    export_cat = None if export_cat_sel == "All Categories" else export_cat_sel
+
+if export_start > export_end:
+    st.error("❌ Start Date must not be after End Date.")
+else:
+    try:
+        fname, csv_bytes = sales_csv(
+            start_date=export_start,
+            end_date=export_end,
+            sku=export_sku,
+            category=export_cat,
+        )
+        # Count rows (bytes → lines minus header minus BOM)
+        row_count = max(0, csv_bytes.decode("utf-8-sig").count("\n") - 1)
+        if row_count == 0:
+            st.button("⬇️ Export Sales CSV", disabled=True,
+                      help="No sales match the selected filters", use_container_width=False)
+            st.info("No sales transactions match the selected filters.")
+        else:
+            st.download_button(
+                label=f"⬇️ Export Sales CSV ({row_count} records)",
+                data=csv_bytes,
+                file_name=fname,
+                mime="text/csv; charset=utf-8",
+                help="Download filtered sales as CSV",
+            )
+    except ValueError as e:
+        st.error(f"❌ Invalid filter: {e}")
+    except Exception as e:
+        st.error(f"❌ Export error: {e}")
 
 st.divider()
 

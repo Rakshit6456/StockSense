@@ -1,6 +1,7 @@
 """Products management page (Person 3).
 Features:
 - Search and category filter
+- Export filtered inventory to CSV
 - Form to add new products (Admin only)
 - Form to edit existing products (Admin only)
 - Form to delete products (Admin only)
@@ -11,6 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from backend import inventory as inv
+from backend.exports import inventory_csv
 from pages._utils import is_admin, render_auth_guard, render_sidebar
 
 st.set_page_config(page_title="Products — StockSense", page_icon="🏷️", layout="wide")
@@ -52,7 +54,52 @@ if stock_status == "Low Stock (<= Safety)":
 elif stock_status == "Out of Stock (0)":
     filtered_products = [p for p in filtered_products if p.get("stock", 0) == 0]
 
-st.markdown(f"**Found {len(filtered_products)} product(s)**")
+# ---------------------------------------------------------------------------
+# SUPPLIER FILTER + EXPORT CSV BUTTON
+# ---------------------------------------------------------------------------
+all_supplier_names = sorted({
+    p.get("supplier_name") for p in all_products if p.get("supplier_name")
+})
+selected_supplier = st.selectbox("\U0001f3ed Filter by Supplier", ["All Suppliers"] + all_supplier_names)
+active_supplier = None if selected_supplier == "All Suppliers" else selected_supplier
+
+if active_supplier:
+    filtered_products = [
+        p for p in filtered_products
+        if (p.get("supplier_name") or "") == active_supplier
+    ]
+
+count_col, export_col = st.columns([3, 1])
+with count_col:
+    st.markdown(f"**Found {len(filtered_products)} product(s)**")
+with export_col:
+    status_map = {
+        "All Items": None,
+        "Low Stock (<= Safety)": "Low Stock",
+        "Out of Stock (0)": "Out of Stock",
+    }
+    export_status = status_map.get(stock_status)
+    if not filtered_products:
+        st.button("\u2b07\ufe0f Export CSV", disabled=True,
+                  help="No products to export", use_container_width=True)
+    else:
+        try:
+            fname, csv_bytes = inventory_csv(
+                search=search_query.strip() or None,
+                category=active_cat,
+                supplier_name=active_supplier,
+                stock_status=export_status,
+            )
+            st.download_button(
+                label="\u2b07\ufe0f Export CSV",
+                data=csv_bytes,
+                file_name=fname,
+                mime="text/csv; charset=utf-8",
+                use_container_width=True,
+                help=f"Download {len(filtered_products)} product(s) as CSV",
+            )
+        except Exception as e:
+            st.error(f"\u274c Export failed: {e}")
 
 if filtered_products:
     table_rows = []
