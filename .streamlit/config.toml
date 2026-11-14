@@ -1,0 +1,4 @@
+[client]
+# pages/ auto-generates a sidebar menu; render_sidebar() in pages/_utils.py draws our own,
+# so hide the built-in one to avoid showing every page twice.
+showSidebarNavigation = false

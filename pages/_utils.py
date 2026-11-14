@@ -60,21 +60,33 @@ def render_sidebar():
         if is_authenticated():
             user = st.session_state.user
             role_badge = "👑 Admin" if user.get("role") == "admin" else "👤 Staff"
-            st.markdown(f"**Logged in as:** `{user.get('username')}`")
-            st.markdown(f"**Role:** {role_badge}")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🚪 Log out", use_container_width=True, key="sb_logout"):
-                    st.session_state.user = None
-                    st.rerun()
-
-            st.divider()
             st.markdown("#### 🧭 Quick Navigation")
             st.page_link("app.py", label="Dashboard", icon="📊")
             st.page_link("pages/1_Products.py", label="Products", icon="🏷️")
             st.page_link("pages/2_Sales_and_Purchases.py", label="Sales & Purchases", icon="💳")
             st.page_link("pages/3_Analytics.py", label="Analytics", icon="📈")
+
+            # Pin the account block to the bottom of the sidebar: stretch the column that holds it
+            # to the sidebar height, then let margin-top:auto push the block down. Streamlit wraps a
+            # keyed container in a stLayoutWrapper, so the rules match that wrapper and its parent column.
+            st.markdown(
+                """<style>
+                [data-testid="stSidebarUserContent"] { padding-bottom: 1rem; }
+                [data-testid="stVerticalBlock"]:has(> [data-testid="stLayoutWrapper"] > .st-key-sb_account),
+                [data-testid="stVerticalBlock"]:has(> .st-key-sb_account) { min-height: calc(100vh - 6rem); }
+                [data-testid="stLayoutWrapper"]:has(> .st-key-sb_account),
+                .st-key-sb_account { margin-top: auto; }
+                </style>""",
+                unsafe_allow_html=True,
+            )
+            with st.container(key="sb_account"):
+                st.divider()
+                st.markdown(f"**Logged in as:** `{user.get('username')}`")
+                st.markdown(f"**Role:** {role_badge}")
+                if st.button("🚪 Log out", use_container_width=True, key="sb_logout"):
+                    st.session_state.user = None
+                    st.rerun()
         else:
             st.info("Please log in on the Dashboard to access pages.")
 
